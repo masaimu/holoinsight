@@ -37,9 +37,11 @@ import io.holoinsight.server.apm.common.model.specification.sw.TraceState;
 import io.holoinsight.server.apm.common.utils.GsonUtils;
 import io.holoinsight.server.apm.engine.postcal.MetricDefine;
 import io.holoinsight.server.common.DurationUtil;
+import io.holoinsight.server.common.J;
 import io.holoinsight.server.common.ProtoJsonUtils;
 import io.holoinsight.server.common.service.SuperCacheService;
 import io.holoinsight.server.extension.MetricStorage;
+import io.holoinsight.server.extension.model.DetailResult;
 import io.holoinsight.server.extension.model.PqlParam;
 import io.holoinsight.server.extension.model.QueryMetricsParam;
 import io.holoinsight.server.extension.model.QueryParam;
@@ -747,6 +749,26 @@ public class DefaultQueryServiceImpl implements QueryService {
     }, "queryServiceErrorDetail", request);
   }
 
+  @Override
+  public QueryProto.QueryDetailResponse queryDetailData(QueryProto.QueryRequest request)
+      throws QueryException {
+    return wrap(() -> {
+      List<QueryProto.Datasource> datasources = request.getDatasourcesList();
+      Assert.notEmpty(datasources, "datasources are empty");
+      String tenant = request.getTenant();
+
+      List<QueryProto.QueryDetailResponse> rsps = new ArrayList<>(datasources.size());
+      for (QueryProto.Datasource datasource : datasources) {
+        QueryProto.QueryDetailResponse.Builder queryResponseBuilder =
+            queryDetail(tenant, datasource);
+        rsps.add(queryResponseBuilder.build());
+      }
+      List<QueryProto.DetailResult> results =
+          rsps.stream().flatMap(rsp -> rsp.getResultsList().stream()).collect(Collectors.toList());
+      return QueryProto.QueryDetailResponse.newBuilder().addAllResults(results).build();
+    }, "queryDetailData", request);
+  }
+
   private QueryProto.QueryResponse simpleQuery(QueryProto.QueryRequest request, String tenant,
       List<QueryProto.Datasource> datasources) throws QueryException {
     List<QueryProto.QueryResponse> rsps = new ArrayList<>(datasources.size());
@@ -1051,6 +1073,49 @@ public class DefaultQueryServiceImpl implements QueryService {
       fillData(builder, datasource.getStart(), datasource.getEnd(), datasource.getDownsample(),
           fillPolicy);
     }
+    return builder;
+  }
+
+  private QueryProto.QueryDetailResponse.Builder queryDetail(String tenant,
+      QueryProto.Datasource datasource) {
+    QueryParam param = QueryStorageUtils.convertToQueryParam(tenant, datasource);
+    DetailResult detailResult = metricStorage.queryDetail(param);
+    QueryProto.QueryDetailResponse.Builder builder = QueryProto.QueryDetailResponse.newBuilder();
+    QueryProto.DetailResult.Builder detailResultBuilder = QueryProto.DetailResult.newBuilder();
+    if (detailResult == null || detailResult.isEmpty()) {
+      log.info("detailResult is empty for {}", J.toJson(datasource));
+      return builder;
+    }
+    detailResultBuilder.addAllHeaders(detailResult.getHeaders()) //
+        .addAllTables(detailResult.getTables()) //
+        .setSql(detailResult.getSql());
+    for (DetailResult.DetailRow detailRow : detailResult.getPoints()) {
+      if (CollectionUtils.isEmpty(detailRow.getValues())) {
+        continue;
+      }
+      QueryProto.DetailRow.Builder resultBuilder = QueryProto.DetailRow.newBuilder();
+      for (DetailResult.Value value : detailRow.getValues()) {
+        QueryProto.DetailValue.Builder valueBuilder = QueryProto.DetailValue.newBuilder();
+        valueBuilder.setType(value.getType().name());
+        switch (value.getType()) {
+          case String:
+            valueBuilder.setStrValue((String) value.getValue());
+            break;
+          case Timestamp:
+            valueBuilder.setTimestampValue(((Number) value.getValue()).longValue());
+            break;
+          case Double:
+            valueBuilder.setDoubleValue(((Number) value.getValue()).doubleValue());
+            break;
+          case Boolean:
+            valueBuilder.setBoolValue((Boolean) value.getValue());
+            break;
+        }
+        resultBuilder.addValues(valueBuilder.build());
+      }
+      detailResultBuilder.addRows(resultBuilder.build());
+    }
+    builder.addResults(detailResultBuilder.build());
     return builder;
   }
 
