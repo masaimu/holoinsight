@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = git@github.com:traas-stack/holoinsight.git
+	branch = main
+	commit = 81c0b2da73d97a9a1d628fc1ac501fcb98528c18
+	parent = e6f3736423bfdf8d3a1e6f8a4e2f3a10990c9ab4
+	method = merge
+	cmdver = 0.4.5
