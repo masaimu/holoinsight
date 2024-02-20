@@ -214,7 +214,9 @@ public class NotificationTemplate {
 
   private String buildTagValue(String alarmTags, boolean tagMarkdown) {
     if (tagMarkdown) {
-      if (alarmTags.startsWith("[")) {
+      if (StringUtils.isEmpty(alarmTags)) {
+        return StringUtils.EMPTY;
+      } else if (alarmTags.startsWith("[")) {
         return alarmTags;
       }
       Map<String /* tagk */, String /* alias */> reverseTagMap = reverseTagMap();
