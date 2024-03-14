@@ -9,7 +9,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 组件注册中心，所有按照环境区分的功能，都以组件的方式注册在这里。 这里还需要做检测，检测环境冲突、组件冲突等。
+ * 组件注册中心， 所有按照环境区分的功能，都以组件的方式注册在这里。 这里还需要做检测，检测环境冲突、组件冲突等。
  */
 @Component
 public class AlertServiceRegistry {
